@@ -16,6 +16,7 @@ final class RootCoordinator: Coordinator {
     }
     
     func start(animated: Bool) {
-        
+        let controller = SplashViewController()
+        navigationController.pushViewController(controller, animated: animated)
     }
 }
