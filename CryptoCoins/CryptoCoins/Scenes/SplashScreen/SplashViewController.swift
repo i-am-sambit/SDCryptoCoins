@@ -8,7 +8,8 @@
 import UIKit
 
 final class SplashViewController: UIViewController {
-
+    var coordinator: SplashCoordinator?
+    
     override func viewDidLoad() {
         super.viewDidLoad()
 
@@ -32,8 +33,16 @@ final class SplashViewController: UIViewController {
         
         imageView.translatesAutoresizingMaskIntoConstraints = false
         imageView.centerXAnchor.constraint(equalTo: view.centerXAnchor).isActive = true
-        imageView.widthAnchor.constraint(equalToConstant: 100).isActive = true
-        imageView.heightAnchor.constraint(equalToConstant: 100).isActive = true
-        imageView.bottomAnchor.constraint(equalTo: label.topAnchor, constant: -30).isActive = true
+        imageView.widthAnchor.constraint(equalToConstant: 80).isActive = true
+        imageView.heightAnchor.constraint(equalToConstant: 80).isActive = true
+        label.topAnchor.constraint(equalTo: imageView.bottomAnchor, constant: 30).isActive = true
+    }
+    
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.coordinator?.navigateToHome()
+        }
     }
 }
