@@ -5,37 +5,55 @@
 //  Created by Sambit Prakash Dash on 21/10/24.
 //
 
+import Combine
 import UIKit
 
-class HomeViewController: UIViewController {
-
+final class HomeViewController: UIViewController {
+    private var headerView: UIView!
+    private var footerView: UIView!
+    private var tableView: UITableView!
+    
+    private weak var coordinator: HomeCoordinator?
+    private var viewModel: HomeViewModel?
+    
+    private var cancellables = Set<AnyCancellable>()
+    
     var safeArea: UIEdgeInsets {
-        UIApplication.shared.keyWindow?.safeAreaInsets ?? .zero
+        let window = UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.keyWindow }.last
+        return window?.safeAreaInsets ?? .zero
+    }
+    
+    func inject(viewModel: HomeViewModel, coordinator: HomeCoordinator? = nil) {
+        self.viewModel = viewModel
+        self.coordinator = coordinator
     }
     
     override func viewDidLoad() {
         super.viewDidLoad()
         self.createView()
+        
+        guard let viewModel else { return }
+        viewModel.$cryptoCoins
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.tableView.reloadData()
+            }
+            .store(in: &cancellables)
+        
+        viewModel.fetchCryptoCoins()
     }
 }
 
 extension HomeViewController {
     private func createView() {
         self.view.backgroundColor = .background
-        let headerView = createHeaderView()
-        
-        let bodyView = createListView()
-        bodyView.topAnchor.constraint(equalTo: headerView.bottomAnchor).isActive = true
-        bodyView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor).isActive = true
-        bodyView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor).isActive = true
-        
-        let footerView = createFilterView()
-        
-        bodyView.bottomAnchor.constraint(equalTo: footerView.topAnchor).isActive = true
+        createHeaderView()
+        createListView()
+        createFilterView()
     }
     
-    private func createHeaderView() -> UIView {
-        let headerView = UIView()
+    private func createHeaderView() {
+        headerView = UIView()
         headerView.backgroundColor = .primaryTheme
         self.view.addSubview(headerView)
         headerView.translatesAutoresizingMaskIntoConstraints = false
@@ -65,11 +83,9 @@ extension HomeViewController {
         searchButton.heightAnchor.constraint(equalToConstant: 40).isActive = true
         headerView.bottomAnchor.constraint(equalTo: searchButton.bottomAnchor, constant: 5).isActive = true
         headerView.trailingAnchor.constraint(equalTo: searchButton.trailingAnchor, constant: 16).isActive = true
-        
-        return headerView
     }
     
-    private func createFilterView() -> UIView {
+    private func createFilterView() {
         let footerView = UIView()
         footerView.backgroundColor = .filterBackground
         self.view.addSubview(footerView)
@@ -158,12 +174,10 @@ extension HomeViewController {
         horizontalBottomStackView.addArrangedSubview(spacerView)
         spacerView.translatesAutoresizingMaskIntoConstraints = false
         spacerView.widthAnchor.constraint(equalToConstant: 50).isActive = true
-        
-        return footerView
     }
     
-    private func createListView() -> UIView {
-        let tableView = UITableView()
+    private func createListView() {
+        tableView = UITableView()
         tableView.dataSource = self
         tableView.estimatedRowHeight = UITableView.automaticDimension
         self.view.addSubview(tableView)
@@ -172,18 +186,21 @@ extension HomeViewController {
         tableView.separatorStyle = UITableViewCell.SeparatorStyle.none
         tableView.tableFooterView = UIView()
         
-        return tableView
+        tableView.topAnchor.constraint(equalTo: headerView.bottomAnchor).isActive = true
+        tableView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor).isActive = true
+        tableView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor).isActive = true
+        tableView.bottomAnchor.constraint(equalTo: self.view.bottomAnchor, constant: safeArea.bottom).isActive = true
     }
 }
 
 extension HomeViewController: UITableViewDataSource, UITableViewDelegate {
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return 10
+        return viewModel?.cryptoCoins.count ?? 0
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "HomeTableViewCell", for: indexPath) as! HomeTableViewCell
-        cell.cryptoCoin = CryptoCointDM(name: "BitCoin", symbol: "BTC", isNew: true, isActive: true, type: "token")
+        cell.cryptoCoin = viewModel?.cryptoCoins[indexPath.row]
         return cell
     }
 }

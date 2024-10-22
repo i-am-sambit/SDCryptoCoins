@@ -18,7 +18,10 @@ final class HomeCoordinator: Coordinator {
     }
     
     func start(animated: Bool) {
+        let service: CryptoServiceable = CryptoService()
+        let viewModel = HomeViewModel(cryptoService: service)
         let controller = HomeViewController()
+        controller.inject(viewModel: viewModel, coordinator: self)
         navigationController.pushViewController(controller, animated: animated)
     }
 }
