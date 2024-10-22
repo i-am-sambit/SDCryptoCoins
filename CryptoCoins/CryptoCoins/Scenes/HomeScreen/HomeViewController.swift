@@ -11,17 +11,27 @@ import UIKit
 final class HomeViewController: UIViewController {
     private var headerView: UIView!
     private var footerView: UIView!
+    private var searchView: UIView!
     private var tableView: UITableView!
+    
+    private var searchViewHeightConstraint: NSLayoutConstraint!
     
     private weak var coordinator: HomeCoordinator?
     private var viewModel: HomeViewModel?
     
     private var cancellables = Set<AnyCancellable>()
+    private var dispatchWorkItem: DispatchWorkItem?
     
-    var safeArea: UIEdgeInsets {
-        let window = UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.keyWindow }.last
-        return window?.safeAreaInsets ?? .zero
-    }
+    lazy var activityIndicator: UIActivityIndicatorView = {
+        let activityIndicator = UIActivityIndicatorView(style: .large)
+        activityIndicator.color = .gray
+        self.view.addSubview(activityIndicator)
+        activityIndicator.translatesAutoresizingMaskIntoConstraints = false
+        
+        activityIndicator.centerXAnchor.constraint(equalTo: self.view.centerXAnchor).isActive = true
+        activityIndicator.centerYAnchor.constraint(equalTo: self.view.centerYAnchor).isActive = true
+        return activityIndicator
+    }()
     
     func inject(viewModel: HomeViewModel, coordinator: HomeCoordinator? = nil) {
         self.viewModel = viewModel
@@ -40,7 +50,34 @@ final class HomeViewController: UIViewController {
             }
             .store(in: &cancellables)
         
+        viewModel.$isLoading
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isLoading in
+                self?.footerView.isHidden = isLoading
+                isLoading ? self?.activityIndicator.startAnimating() : self?.activityIndicator.stopAnimating()
+            }
+            .store(in: &cancellables)
+        
         viewModel.fetchCryptoCoins()
+    }
+    
+    override func viewSafeAreaInsetsDidChange() {
+        super.viewSafeAreaInsetsDidChange()
+        
+        headerView.topAnchor.constraint(equalTo: self.view.topAnchor).isActive = true
+        headerView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor).isActive = true
+        headerView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor).isActive = true
+        headerView.heightAnchor.constraint(equalToConstant: self.view.safeAreaInsets.top + 50).isActive = true
+        
+        footerView.heightAnchor.constraint(equalToConstant: 122 + self.view.safeAreaInsets.bottom).isActive = true
+        footerView.bottomAnchor.constraint(equalTo: self.view.bottomAnchor).isActive = true
+        footerView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor).isActive = true
+        footerView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor).isActive = true
+        
+        tableView.topAnchor.constraint(equalTo: searchView.bottomAnchor).isActive = true
+        tableView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor).isActive = true
+        tableView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor).isActive = true
+        tableView.bottomAnchor.constraint(equalTo: self.footerView.topAnchor).isActive = true
     }
 }
 
@@ -48,7 +85,7 @@ extension HomeViewController {
     private func createView() {
         self.view.backgroundColor = .background
         createHeaderView()
-        createListView()
+        createBodyView()
         createFilterView()
     }
     
@@ -57,11 +94,6 @@ extension HomeViewController {
         headerView.backgroundColor = .primaryTheme
         self.view.addSubview(headerView)
         headerView.translatesAutoresizingMaskIntoConstraints = false
-        
-        headerView.topAnchor.constraint(equalTo: self.view.topAnchor).isActive = true
-        headerView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor).isActive = true
-        headerView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor).isActive = true
-        headerView.heightAnchor.constraint(equalToConstant: safeArea.top + 50).isActive = true
         
         let headerTitleLabel = UILabel()
         headerTitleLabel.text = "COIN"
@@ -78,6 +110,16 @@ extension HomeViewController {
         searchButton.tintColor = .white
         headerView.addSubview(searchButton)
         searchButton.translatesAutoresizingMaskIntoConstraints = false
+        searchButton.addAction(
+            UIAction { [unowned self, unowned searchButton] _ in
+                searchButton.isSelected = !searchButton.isSelected
+                self.searchViewHeightConstraint.constant = searchButton.isSelected ? 65 : 0
+                UIView.animate(withDuration: 0.3, delay: 0.0, options: .curveLinear) {
+                    self.view.layoutIfNeeded()
+                }
+            },
+            for: .touchUpInside
+        )
         
         searchButton.widthAnchor.constraint(equalToConstant: 40).isActive = true
         searchButton.heightAnchor.constraint(equalToConstant: 40).isActive = true
@@ -86,16 +128,11 @@ extension HomeViewController {
     }
     
     private func createFilterView() {
-        let footerView = UIView()
+        footerView = UIView()
         footerView.backgroundColor = .filterBackground
         self.view.addSubview(footerView)
         footerView.insetsLayoutMarginsFromSafeArea = true
         footerView.translatesAutoresizingMaskIntoConstraints = false
-        
-        footerView.heightAnchor.constraint(equalToConstant: 122 + safeArea.bottom).isActive = true
-        footerView.bottomAnchor.constraint(equalTo: self.view.bottomAnchor).isActive = true
-        footerView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor).isActive = true
-        footerView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor).isActive = true
         
         let verticalStackView = UIStackView()
         verticalStackView.axis = .vertical
@@ -106,7 +143,7 @@ extension HomeViewController {
         
         verticalStackView.topAnchor.constraint(equalTo: footerView.topAnchor, constant: 16).isActive = true
         verticalStackView.leadingAnchor.constraint(equalTo: footerView.leadingAnchor, constant: 16).isActive = true
-        footerView.bottomAnchor.constraint(equalTo: verticalStackView.bottomAnchor, constant: safeArea.bottom + 16).isActive = true
+        footerView.safeAreaLayoutGuide.bottomAnchor.constraint(equalTo: verticalStackView.bottomAnchor, constant: 16).isActive = true
         footerView.trailingAnchor.constraint(equalTo: verticalStackView.trailingAnchor, constant: 16).isActive = true
         
         let horizontaltopStackView = UIStackView()
@@ -124,6 +161,13 @@ extension HomeViewController {
         activeCoinsButton.layer.cornerRadius = 20
         horizontaltopStackView.addArrangedSubview(activeCoinsButton)
         activeCoinsButton.translatesAutoresizingMaskIntoConstraints = false
+        activeCoinsButton.addAction(
+            UIAction { [weak self, weak activeCoinsButton] _ in
+                self?.viewModel?.filterOnlyActiveCoins()
+                activeCoinsButton?.isSelected.toggle()
+            },
+            for: .touchUpInside
+        )
         
         let inactiveCoinsButton = UIButton()
         inactiveCoinsButton.setTitle("Inactive coins", for: .normal)
@@ -133,6 +177,12 @@ extension HomeViewController {
         inactiveCoinsButton.layer.cornerRadius = 20
         horizontaltopStackView.addArrangedSubview(inactiveCoinsButton)
         inactiveCoinsButton.translatesAutoresizingMaskIntoConstraints = false
+        inactiveCoinsButton.addAction(
+            UIAction { [weak self] _ in
+                self?.viewModel?.filterOnlyInactiveCoins()
+            },
+            for: .touchUpInside
+        )
         
         let onlyTokenButton = UIButton()
         onlyTokenButton.setTitle("Only Tokens", for: .normal)
@@ -142,6 +192,12 @@ extension HomeViewController {
         onlyTokenButton.layer.cornerRadius = 20
         horizontaltopStackView.addArrangedSubview(onlyTokenButton)
         onlyTokenButton.translatesAutoresizingMaskIntoConstraints = false
+        onlyTokenButton.addAction(
+            UIAction { [weak self] _ in
+                self?.viewModel?.filterOnlyToken()
+            },
+            for: .touchUpInside
+        )
         
         let horizontalBottomStackView = UIStackView()
         horizontalBottomStackView.axis = .horizontal
@@ -152,23 +208,35 @@ extension HomeViewController {
         
         let onlyCoinsButton = UIButton()
         onlyCoinsButton.setImage(UIImage(systemName: "checkmark"), for: .normal)
-        onlyCoinsButton.setTitle("Active coins", for: .normal)
+        onlyCoinsButton.setTitle("Only coins", for: .normal)
         onlyCoinsButton.setTitleColor(.black, for: .normal)
         onlyCoinsButton.titleLabel?.font = .systemFont(ofSize: 14)
         onlyCoinsButton.backgroundColor = .filterBottomButton
         onlyCoinsButton.layer.cornerRadius = 20
         horizontalBottomStackView.addArrangedSubview(onlyCoinsButton)
         onlyCoinsButton.translatesAutoresizingMaskIntoConstraints = false
+        onlyCoinsButton.addAction(
+            UIAction { [weak self] _ in
+                self?.viewModel?.filterOnlyActiveCoins()
+            },
+            for: .touchUpInside
+        )
         
         let newCryptoButton = UIButton()
         newCryptoButton.setImage(UIImage(systemName: "checkmark"), for: .normal)
-        newCryptoButton.setTitle("Inactive coins", for: .normal)
+        newCryptoButton.setTitle("New cryptos", for: .normal)
         newCryptoButton.setTitleColor(.black, for: .normal)
         newCryptoButton.titleLabel?.font = .systemFont(ofSize: 14)
         newCryptoButton.backgroundColor = .filterBottomButton
         newCryptoButton.layer.cornerRadius = 20
         horizontalBottomStackView.addArrangedSubview(newCryptoButton)
         newCryptoButton.translatesAutoresizingMaskIntoConstraints = false
+        newCryptoButton.addAction(
+            UIAction { [weak self] _ in
+                self?.viewModel?.filterOnlyNewCoins()
+            },
+            for: .touchUpInside
+        )
         
         let spacerView = UIView()
         horizontalBottomStackView.addArrangedSubview(spacerView)
@@ -176,20 +244,43 @@ extension HomeViewController {
         spacerView.widthAnchor.constraint(equalToConstant: 50).isActive = true
     }
     
-    private func createListView() {
+    private func createBodyView() {
+        searchView = UIView()
+        searchView.backgroundColor = .primaryTheme
+        self.view.addSubview(searchView)
+        searchView.translatesAutoresizingMaskIntoConstraints = false
+        searchView.clipsToBounds = true
+        
+        searchViewHeightConstraint = searchView.heightAnchor.constraint(equalToConstant: 0)
+        searchViewHeightConstraint.isActive = true
+        searchView.topAnchor.constraint(equalTo: headerView.bottomAnchor).isActive = true
+        searchView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor).isActive = true
+        searchView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor).isActive = true
+        
+        let searchBar = UISearchBar()
+        searchBar.placeholder = "Search coin or symbol"
+        searchBar.delegate = self
+        searchBar.searchBarStyle = .minimal
+        searchBar.backgroundColor = .primaryTheme
+        searchBar.layer.cornerRadius = 5
+        searchBar.isTranslucent = true
+        searchBar.searchTextField.backgroundColor = .background
+        searchView.addSubview(searchBar)
+        searchBar.translatesAutoresizingMaskIntoConstraints = false
+        
+        searchBar.topAnchor.constraint(equalTo: searchView.topAnchor).isActive = true
+        searchBar.leadingAnchor.constraint(equalTo: searchView.leadingAnchor).isActive = true
+        searchView.bottomAnchor.constraint(equalTo: searchBar.bottomAnchor).isActive = true
+        searchView.trailingAnchor.constraint(equalTo: searchBar.trailingAnchor).isActive = true
+        
         tableView = UITableView()
         tableView.dataSource = self
         tableView.estimatedRowHeight = UITableView.automaticDimension
         self.view.addSubview(tableView)
         tableView.translatesAutoresizingMaskIntoConstraints = false
-        tableView.register(HomeTableViewCell.self, forCellReuseIdentifier: "HomeTableViewCell")
+        tableView.register(HomeTableViewCell.self, forCellReuseIdentifier: HomeTableViewCell.reuseIdentifier)
         tableView.separatorStyle = UITableViewCell.SeparatorStyle.none
         tableView.tableFooterView = UIView()
-        
-        tableView.topAnchor.constraint(equalTo: headerView.bottomAnchor).isActive = true
-        tableView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor).isActive = true
-        tableView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor).isActive = true
-        tableView.bottomAnchor.constraint(equalTo: self.view.bottomAnchor, constant: safeArea.bottom).isActive = true
     }
 }
 
@@ -199,9 +290,20 @@ extension HomeViewController: UITableViewDataSource, UITableViewDelegate {
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "HomeTableViewCell", for: indexPath) as! HomeTableViewCell
+        let cell = tableView.dequeueReusableCell(withIdentifier: HomeTableViewCell.reuseIdentifier, for: indexPath) as! HomeTableViewCell
         cell.cryptoCoin = viewModel?.cryptoCoins[indexPath.row]
         return cell
+    }
+}
+
+extension HomeViewController: UISearchBarDelegate {
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        dispatchWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [unowned self] in
+            self.viewModel?.filterCoins(with: searchText.lowercased())
+        }
+        dispatchWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7, execute: workItem)
     }
 }
 

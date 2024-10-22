@@ -13,19 +13,21 @@ final class HomeTableViewCell: UITableViewCell {
     private var coinImageView: UIImageView!
     private var newImageView: UIImageView!
     
-    var cryptoCoin: CryptoCointDM? = nil {
+    var cryptoCoin: CryptoCoinDM? = nil {
         didSet {
             guard let cryptoCoin else { return }
             titleLabel.text = cryptoCoin.name
             subTitleLabel.text = cryptoCoin.symbol
-            coinImageView.image = .activeCryptoCoin
-            newImageView.isHidden = !cryptoCoin.isNew
+            coinImageView.image = cryptoCoin.icon
+            newImageView.isHidden = cryptoCoin.isNew == false
+            
+            self.layer.opacity = cryptoCoin.isActive ? 1.0 : 0.6
         }
     }
     
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
-        
+        self.selectionStyle = .none
         self.createView()
     }
     
