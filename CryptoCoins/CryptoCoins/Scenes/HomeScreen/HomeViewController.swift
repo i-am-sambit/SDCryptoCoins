@@ -9,20 +9,51 @@ import Combine
 import UIKit
 
 final class HomeViewController: UIViewController {
-    private var headerView: UIView!
-    private var footerView: UIView!
-    private var searchView: UIView!
-    private var tableView: UITableView!
-    
-    private var searchViewHeightConstraint: NSLayoutConstraint!
-    
     private weak var coordinator: HomeCoordinator?
     private var viewModel: HomeViewModel?
     
     private var cancellables = Set<AnyCancellable>()
     private var dispatchWorkItem: DispatchWorkItem?
     
-    lazy var activityIndicator: UIActivityIndicatorView = {
+    private lazy var headerView: UIView = {
+        let headerView = UIView()
+        headerView.backgroundColor = .primaryTheme
+        self.view.addSubview(headerView)
+        headerView.translatesAutoresizingMaskIntoConstraints = false
+        return headerView
+    }()
+    
+    private lazy var footerView: UIView = {
+        let footerView = UIView()
+        footerView.backgroundColor = .filterBackground
+        self.view.addSubview(footerView)
+        footerView.insetsLayoutMarginsFromSafeArea = true
+        footerView.translatesAutoresizingMaskIntoConstraints = false
+        return footerView
+    }()
+    
+    private lazy var searchView: UIView = {
+        let searchView = UIView()
+        searchView.backgroundColor = .primaryTheme
+        self.view.addSubview(searchView)
+        searchView.translatesAutoresizingMaskIntoConstraints = false
+        searchView.clipsToBounds = true
+        return searchView
+    }()
+    
+    private lazy var tableView: UITableView = {
+        let tableView = UITableView()
+        tableView.dataSource = self
+        tableView.estimatedRowHeight = UITableView.automaticDimension
+        self.view.addSubview(tableView)
+        tableView.translatesAutoresizingMaskIntoConstraints = false
+        tableView.register(HomeTableViewCell.self, forCellReuseIdentifier: HomeTableViewCell.reuseIdentifier)
+        tableView.separatorStyle = UITableViewCell.SeparatorStyle.none
+        tableView.tableFooterView = UIView()
+        return tableView
+    }()
+    
+    private lazy var activityIndicator: UIActivityIndicatorView = {
         let activityIndicator = UIActivityIndicatorView(style: .large)
         activityIndicator.color = .gray
         self.view.addSubview(activityIndicator)
@@ -31,6 +62,24 @@ final class HomeViewController: UIViewController {
         activityIndicator.centerXAnchor.constraint(equalTo: self.view.centerXAnchor).isActive = true
         activityIndicator.centerYAnchor.constraint(equalTo: self.view.centerYAnchor).isActive = true
         return activityIndicator
+    }()
+    
+    private lazy var searchBar: UISearchBar = {
+        let searchBar = UISearchBar()
+        searchBar.placeholder = "Search coin or symbol"
+        searchBar.delegate = self
+        searchBar.searchBarStyle = .minimal
+        searchBar.backgroundColor = .primaryTheme
+        searchBar.layer.cornerRadius = 5
+        searchBar.isTranslucent = true
+        searchBar.searchTextField.backgroundColor = .background
+        searchView.addSubview(searchBar)
+        searchBar.translatesAutoresizingMaskIntoConstraints = false
+        return searchBar
+    }()
+    
+    private lazy var searchViewHeightConstraint: NSLayoutConstraint = {
+        searchView.heightAnchor.constraint(equalToConstant: 0)
     }()
     
     func inject(viewModel: HomeViewModel, coordinator: HomeCoordinator? = nil) {
@@ -90,11 +139,6 @@ extension HomeViewController {
     }
     
     private func createHeaderView() {
-        headerView = UIView()
-        headerView.backgroundColor = .primaryTheme
-        self.view.addSubview(headerView)
-        headerView.translatesAutoresizingMaskIntoConstraints = false
-        
         let headerTitleLabel = UILabel()
         headerTitleLabel.text = "COIN"
         headerTitleLabel.font = .boldSystemFont(ofSize: 20)
@@ -113,6 +157,9 @@ extension HomeViewController {
         searchButton.addAction(
             UIAction { [unowned self, unowned searchButton] _ in
                 searchButton.isSelected = !searchButton.isSelected
+                
+                self.searchBar.text = ""
+                self.viewModel?.filterText = ""
                 self.searchViewHeightConstraint.constant = searchButton.isSelected ? 65 : 0
                 UIView.animate(withDuration: 0.3, delay: 0.0, options: .curveLinear) {
                     self.view.layoutIfNeeded()
@@ -128,12 +175,6 @@ extension HomeViewController {
     }
     
     private func createFilterView() {
-        footerView = UIView()
-        footerView.backgroundColor = .filterBackground
-        self.view.addSubview(footerView)
-        footerView.insetsLayoutMarginsFromSafeArea = true
-        footerView.translatesAutoresizingMaskIntoConstraints = false
-        
         let verticalStackView = UIStackView()
         verticalStackView.axis = .vertical
         verticalStackView.spacing = 10
@@ -154,7 +195,7 @@ extension HomeViewController {
         horizontaltopStackView.translatesAutoresizingMaskIntoConstraints = false
         
         let activeCoinsButton = UIButton()
-        activeCoinsButton.setTitle("Active coins", for: .normal)
+        activeCoinsButton.setTitle(CryptoFilter.active, for: .normal)
         activeCoinsButton.setTitleColor(.black, for: .normal)
         activeCoinsButton.titleLabel?.font = .systemFont(ofSize: 14)
         activeCoinsButton.backgroundColor = .filterTopButton
@@ -162,15 +203,19 @@ extension HomeViewController {
         horizontaltopStackView.addArrangedSubview(activeCoinsButton)
         activeCoinsButton.translatesAutoresizingMaskIntoConstraints = false
         activeCoinsButton.addAction(
-            UIAction { [weak self, weak activeCoinsButton] _ in
-                self?.viewModel?.filterOnlyActiveCoins()
-                activeCoinsButton?.isSelected.toggle()
+            UIAction { [unowned self, unowned activeCoinsButton] _ in
+                activeCoinsButton.isSelected.toggle()
+                self.viewModel?.toggleFilter(.active)
+                
+                activeCoinsButton.apply(
+                    shadow: activeCoinsButton.isSelected ? .shadow(color: .black, opacity: 1, offset: CGSize(width: 0, height: 2), radius: 4) : .remove
+                )
             },
             for: .touchUpInside
         )
         
         let inactiveCoinsButton = UIButton()
-        inactiveCoinsButton.setTitle("Inactive coins", for: .normal)
+        inactiveCoinsButton.setTitle(CryptoFilter.inactive, for: .normal)
         inactiveCoinsButton.setTitleColor(.black, for: .normal)
         inactiveCoinsButton.titleLabel?.font = .systemFont(ofSize: 14)
         inactiveCoinsButton.backgroundColor = .filterTopButton
@@ -178,14 +223,19 @@ extension HomeViewController {
         horizontaltopStackView.addArrangedSubview(inactiveCoinsButton)
         inactiveCoinsButton.translatesAutoresizingMaskIntoConstraints = false
         inactiveCoinsButton.addAction(
-            UIAction { [weak self] _ in
-                self?.viewModel?.filterOnlyInactiveCoins()
+            UIAction { [unowned self, unowned inactiveCoinsButton] _ in
+                inactiveCoinsButton.isSelected.toggle()
+                self.viewModel?.toggleFilter(.inactive)
+                
+                inactiveCoinsButton.apply(
+                    shadow: inactiveCoinsButton.isSelected ? .shadow(color: .black, opacity: 1, offset: CGSize(width: 0, height: 2), radius: 4) : .remove
+                )
             },
             for: .touchUpInside
         )
         
         let onlyTokenButton = UIButton()
-        onlyTokenButton.setTitle("Only Tokens", for: .normal)
+        onlyTokenButton.setTitle(CryptoFilter.token, for: .normal)
         onlyTokenButton.setTitleColor(.black, for: .normal)
         onlyTokenButton.titleLabel?.font = .systemFont(ofSize: 14)
         onlyTokenButton.backgroundColor = .filterTopButton
@@ -193,8 +243,13 @@ extension HomeViewController {
         horizontaltopStackView.addArrangedSubview(onlyTokenButton)
         onlyTokenButton.translatesAutoresizingMaskIntoConstraints = false
         onlyTokenButton.addAction(
-            UIAction { [weak self] _ in
-                self?.viewModel?.filterOnlyToken()
+            UIAction { [unowned self, unowned onlyTokenButton] _ in
+                onlyTokenButton.isSelected.toggle()
+                self.viewModel?.toggleFilter(.token)
+                
+                onlyTokenButton.apply(
+                    shadow: onlyTokenButton.isSelected ? .shadow(color: .black, opacity: 1, offset: CGSize(width: 0, height: 2), radius: 4) : .remove
+                )
             },
             for: .touchUpInside
         )
@@ -207,33 +262,41 @@ extension HomeViewController {
         horizontalBottomStackView.translatesAutoresizingMaskIntoConstraints = false
         
         let onlyCoinsButton = UIButton()
-        onlyCoinsButton.setImage(UIImage(systemName: "checkmark"), for: .normal)
-        onlyCoinsButton.setTitle("Only coins", for: .normal)
+        onlyCoinsButton.setTitle(CryptoFilter.coins, for: .normal)
         onlyCoinsButton.setTitleColor(.black, for: .normal)
         onlyCoinsButton.titleLabel?.font = .systemFont(ofSize: 14)
-        onlyCoinsButton.backgroundColor = .filterBottomButton
+        onlyCoinsButton.backgroundColor = .filterTopButton
         onlyCoinsButton.layer.cornerRadius = 20
         horizontalBottomStackView.addArrangedSubview(onlyCoinsButton)
         onlyCoinsButton.translatesAutoresizingMaskIntoConstraints = false
         onlyCoinsButton.addAction(
-            UIAction { [weak self] _ in
-                self?.viewModel?.filterOnlyActiveCoins()
+            UIAction { [unowned self, unowned onlyCoinsButton] _ in
+                onlyCoinsButton.isSelected.toggle()
+                self.viewModel?.toggleFilter(.coins)
+                
+                onlyCoinsButton.apply(
+                    shadow: onlyCoinsButton.isSelected ? .shadow(color: .black, opacity: 1, offset: CGSize(width: 0, height: 2), radius: 4) : .remove
+                )
             },
             for: .touchUpInside
         )
         
         let newCryptoButton = UIButton()
-        newCryptoButton.setImage(UIImage(systemName: "checkmark"), for: .normal)
-        newCryptoButton.setTitle("New cryptos", for: .normal)
+        newCryptoButton.setTitle(CryptoFilter.new, for: .normal)
         newCryptoButton.setTitleColor(.black, for: .normal)
         newCryptoButton.titleLabel?.font = .systemFont(ofSize: 14)
-        newCryptoButton.backgroundColor = .filterBottomButton
+        newCryptoButton.backgroundColor = .filterTopButton
         newCryptoButton.layer.cornerRadius = 20
         horizontalBottomStackView.addArrangedSubview(newCryptoButton)
         newCryptoButton.translatesAutoresizingMaskIntoConstraints = false
         newCryptoButton.addAction(
-            UIAction { [weak self] _ in
-                self?.viewModel?.filterOnlyNewCoins()
+            UIAction { [unowned self, unowned newCryptoButton] _ in
+                newCryptoButton.isSelected.toggle()
+                self.viewModel?.toggleFilter(.new)
+                
+                newCryptoButton.apply(
+                    shadow: newCryptoButton.isSelected ? .shadow(color: .black, opacity: 1, offset: CGSize(width: 0, height: 2), radius: 4) : .remove
+                )
             },
             for: .touchUpInside
         )
@@ -245,42 +308,15 @@ extension HomeViewController {
     }
     
     private func createBodyView() {
-        searchView = UIView()
-        searchView.backgroundColor = .primaryTheme
-        self.view.addSubview(searchView)
-        searchView.translatesAutoresizingMaskIntoConstraints = false
-        searchView.clipsToBounds = true
-        
-        searchViewHeightConstraint = searchView.heightAnchor.constraint(equalToConstant: 0)
         searchViewHeightConstraint.isActive = true
         searchView.topAnchor.constraint(equalTo: headerView.bottomAnchor).isActive = true
         searchView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor).isActive = true
         searchView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor).isActive = true
         
-        let searchBar = UISearchBar()
-        searchBar.placeholder = "Search coin or symbol"
-        searchBar.delegate = self
-        searchBar.searchBarStyle = .minimal
-        searchBar.backgroundColor = .primaryTheme
-        searchBar.layer.cornerRadius = 5
-        searchBar.isTranslucent = true
-        searchBar.searchTextField.backgroundColor = .background
-        searchView.addSubview(searchBar)
-        searchBar.translatesAutoresizingMaskIntoConstraints = false
-        
         searchBar.topAnchor.constraint(equalTo: searchView.topAnchor).isActive = true
         searchBar.leadingAnchor.constraint(equalTo: searchView.leadingAnchor).isActive = true
         searchView.bottomAnchor.constraint(equalTo: searchBar.bottomAnchor).isActive = true
         searchView.trailingAnchor.constraint(equalTo: searchBar.trailingAnchor).isActive = true
-        
-        tableView = UITableView()
-        tableView.dataSource = self
-        tableView.estimatedRowHeight = UITableView.automaticDimension
-        self.view.addSubview(tableView)
-        tableView.translatesAutoresizingMaskIntoConstraints = false
-        tableView.register(HomeTableViewCell.self, forCellReuseIdentifier: HomeTableViewCell.reuseIdentifier)
-        tableView.separatorStyle = UITableViewCell.SeparatorStyle.none
-        tableView.tableFooterView = UIView()
     }
 }
 
@@ -300,7 +336,7 @@ extension HomeViewController: UISearchBarDelegate {
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
         dispatchWorkItem?.cancel()
         let workItem = DispatchWorkItem { [unowned self] in
-            self.viewModel?.filterCoins(with: searchText.lowercased())
+            self.viewModel?.filterText = searchText.lowercased()
         }
         dispatchWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.7, execute: workItem)

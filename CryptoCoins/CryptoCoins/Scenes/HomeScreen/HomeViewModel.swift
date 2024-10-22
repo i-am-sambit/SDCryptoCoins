@@ -16,6 +16,24 @@ final class HomeViewModel: ObservableObject {
     
     private var cryptoService: CryptoServiceable
     
+    var activeFilters: CryptoFilterOptions = [] {
+        didSet {
+            let filteredCoins = applyFilters(with: filterText)
+            cryptoCoins = filteredCoins
+        }
+    }
+    
+    var filterText: String = "" {
+        didSet {
+            guard !filterText.isEmpty else {
+                self.cryptoCoins = applyFilters(with: filterText)
+                return
+            }
+            let filteredCoins = applyFilters(with: filterText)
+            self.cryptoCoins = filteredCoins
+        }
+    }
+    
     init(cryptoService: CryptoServiceable) {
         self.cryptoService = cryptoService
     }
@@ -41,37 +59,44 @@ final class HomeViewModel: ObservableObject {
         }
     }
     
-    func filterOnlyActiveCoins() {
-        let filteredCoins = allCoins.filter({ $0.type == .coin && $0.isActive })
-        self.cryptoCoins = filteredCoins
-    }
-    
-    func filterOnlyInactiveCoins() {
-        let filteredCoins = allCoins.filter({ !$0.isActive })
-        self.cryptoCoins = filteredCoins
-    }
-    
-    func filterOnlyNewCoins() {
-        let filteredCoins = allCoins.filter({ $0.isNew })
-        self.cryptoCoins = filteredCoins
-    }
-    
-    func filterOnlyToken() {
-        let filteredCoins = allCoins.filter({ $0.type == .token })
-        self.cryptoCoins = filteredCoins
-    }
-    
-    func filterOnlyCoins() {
-        let filteredCoins = allCoins.filter({ $0.type == .coin })
-        self.cryptoCoins = filteredCoins
-    }
-    
-    func filterCoins(with text: String) {
-        guard !text.isEmpty else {
-            self.cryptoCoins = allCoins
-            return
+    func toggleFilter(_ filter: CryptoFilterOptions) {
+        if activeFilters.contains(filter) {
+            activeFilters.remove(filter)
+        } else {
+            activeFilters.insert(filter)
         }
-        let filteredCoins = allCoins.filter({ $0.name.lowercased().contains(text) || $0.symbol.lowercased().contains(text) })
-        self.cryptoCoins = filteredCoins
+    }
+    
+    private func applyFilters(with text: String) -> [CryptoCoinDM] {
+        return allCoins
+            .filter { coin in
+                guard !text.isEmpty else { return true }
+                return coin.name.lowercased().contains(text) || coin.symbol.lowercased().contains(text)
+            }
+            .filter { coin in
+            var matches = true
+            
+            if activeFilters.contains(.active) {
+                matches = matches && coin.isActive
+            }
+            
+            if activeFilters.contains(.inactive) {
+                matches = matches && !coin.isActive
+            }
+            
+            if activeFilters.contains(.new) {
+                matches = matches && coin.isNew
+            }
+            
+            if activeFilters.contains(.token) {
+                matches = matches && coin.type == .token
+            }
+            
+            if activeFilters.contains(.coins) {
+                matches = matches && coin.type == .coin
+            }
+            
+            return matches
+        }
     }
 }
