@@ -9,16 +9,16 @@ import Foundation
 import UIKit
 
 protocol RootCoordinatorProtocol: Coordinator {
-    func moveToHome()
+    func moveToHome(animated: Bool)
 }
 
 extension RootCoordinatorProtocol {
-    func moveToHome() {
+    func moveToHome(animated: Bool) {
         HomeCoordinator(
             navigationController: self.navigationController,
             rootCoordinator: self
         )
-        .start(animated: true)
+        .start(animated: animated)
     }
 }
 

@@ -24,6 +24,6 @@ final class SplashCoordinator: Coordinator {
     }
     
     func navigateToHome() {
-        rootCoordinator.moveToHome()
+        rootCoordinator.moveToHome(animated: false)
     }
 }

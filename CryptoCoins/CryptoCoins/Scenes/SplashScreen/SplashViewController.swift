@@ -46,3 +46,7 @@ final class SplashViewController: UIViewController {
         }
     }
 }
+
+#Preview {
+    SplashViewController()
+}
