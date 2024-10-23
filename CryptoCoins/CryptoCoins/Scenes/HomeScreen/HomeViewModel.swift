@@ -16,7 +16,7 @@ final class HomeViewModel: ObservableObject {
     
     private var cryptoService: CryptoServiceable
     
-    var activeFilters: CryptoFilterOptions = [] {
+    @Published var activeFilters: CryptoFilterOptions = [] {
         didSet {
             let filteredCoins = applyFilters(with: filterText)
             cryptoCoins = filteredCoins
@@ -63,6 +63,17 @@ final class HomeViewModel: ObservableObject {
         if activeFilters.contains(filter) {
             activeFilters.remove(filter)
         } else {
+            if filter == .coins {
+                activeFilters.remove(.token)
+            } else if filter == .token {
+                activeFilters.remove(.coins)
+            }
+            
+            if filter == .active {
+                activeFilters.remove(.inactive)
+            } else if filter == .inactive {
+                activeFilters.remove(.active)
+            }
             activeFilters.insert(filter)
         }
     }
