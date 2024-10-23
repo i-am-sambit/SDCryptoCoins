@@ -38,23 +38,21 @@ final class HomeViewModel: ObservableObject {
         self.cryptoService = cryptoService
     }
     
-    func fetchCryptoCoins() {
+    func fetchCryptoCoins() async {
         isLoading = true
-        Task {
-            do {
-                let coins = try await cryptoService.fetchCryptoCoins()
-                await MainActor.run { [weak self] in
-                    guard let self else { return }
-                    self.allCoins = coins
-                    self.cryptoCoins = coins
-                    self.isLoading = false
-                }
-            } catch let error as NetworkError {
-                await MainActor.run { [weak self] in
-                    guard let self else { return }
-                    self.error = error
-                    self.isLoading = false
-                }
+        do {
+            let coins = try await cryptoService.fetchCryptoCoins()
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                self.allCoins = coins
+                self.cryptoCoins = coins
+                self.isLoading = false
+            }
+        } catch let error {
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                self.error = error
+                self.isLoading = false
             }
         }
     }

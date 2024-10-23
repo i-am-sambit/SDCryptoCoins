@@ -262,9 +262,9 @@ final class HomeViewController: UIViewController {
                 isLoading ? self?.activityIndicator.startAnimating() : self?.activityIndicator.stopAnimating()
             }
             .store(in: &cancellables)
-        
-        viewModel.fetchCryptoCoins()
-        
+        Task {
+            await viewModel.fetchCryptoCoins()
+        }
         viewModel.$activeFilters
             .receive(on: DispatchQueue.main)
             .sink { [unowned self] activeFilters in
