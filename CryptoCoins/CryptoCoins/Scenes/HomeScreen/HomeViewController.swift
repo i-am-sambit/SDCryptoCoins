@@ -93,7 +93,7 @@ final class HomeViewController: UIViewController {
     private lazy var onlyTokenButton: UIButton = {
         let button = UIButton()
         button.setTitle(CryptoFilter.token, for: .normal)
-        button.setTitleColor(.black, for: .normal)
+        button.setTitleColor(UIColor(.primary), for: .normal)
         button.titleLabel?.font = .systemFont(ofSize: 14)
         button.backgroundColor = .filterTopButton
         button.layer.cornerRadius = 20
@@ -110,7 +110,7 @@ final class HomeViewController: UIViewController {
     private lazy var onlyCoinsButton: UIButton = {
         let button = UIButton()
         button.setTitle(CryptoFilter.coins, for: .normal)
-        button.setTitleColor(.black, for: .normal)
+        button.setTitleColor(UIColor(.primary), for: .normal)
         button.titleLabel?.font = .systemFont(ofSize: 14)
         button.backgroundColor = .filterTopButton
         button.layer.cornerRadius = 20
@@ -127,7 +127,7 @@ final class HomeViewController: UIViewController {
     private lazy var activeCryptosButton: UIButton = {
         let button = UIButton()
         button.setTitle(CryptoFilter.active, for: .normal)
-        button.setTitleColor(.black, for: .normal)
+        button.setTitleColor(UIColor(.primary), for: .normal)
         button.titleLabel?.font = .systemFont(ofSize: 14)
         button.backgroundColor = .filterTopButton
         button.layer.cornerRadius = 20
@@ -144,7 +144,7 @@ final class HomeViewController: UIViewController {
     lazy var inactiveCryptosButton: UIButton = {
         let button = UIButton()
         button.setTitle(CryptoFilter.inactive, for: .normal)
-        button.setTitleColor(.black, for: .normal)
+        button.setTitleColor(UIColor(.primary), for: .normal)
         button.titleLabel?.font = .systemFont(ofSize: 14)
         button.backgroundColor = .filterTopButton
         button.layer.cornerRadius = 20
@@ -161,7 +161,7 @@ final class HomeViewController: UIViewController {
     lazy var newCryptoButton: UIButton = {
         let button = UIButton()
         button.setTitle(CryptoFilter.new, for: .normal)
-        button.setTitleColor(.black, for: .normal)
+        button.setTitleColor(UIColor(.primary), for: .normal)
         button.titleLabel?.font = .systemFont(ofSize: 14)
         button.backgroundColor = .filterTopButton
         button.layer.cornerRadius = 20
@@ -201,6 +201,7 @@ final class HomeViewController: UIViewController {
         let tableView = UITableView()
         tableView.dataSource = self
         tableView.estimatedRowHeight = UITableView.automaticDimension
+        tableView.backgroundColor = .background
         self.view.addSubview(tableView)
         tableView.translatesAutoresizingMaskIntoConstraints = false
         tableView.register(HomeTableViewCell.self, forCellReuseIdentifier: HomeTableViewCell.reuseIdentifier)
@@ -262,7 +263,7 @@ final class HomeViewController: UIViewController {
                 isLoading ? self?.activityIndicator.startAnimating() : self?.activityIndicator.stopAnimating()
             }
             .store(in: &cancellables)
-        Task {
+        Task(priority: .background) {
             await viewModel.fetchCryptoCoins()
         }
         viewModel.$activeFilters

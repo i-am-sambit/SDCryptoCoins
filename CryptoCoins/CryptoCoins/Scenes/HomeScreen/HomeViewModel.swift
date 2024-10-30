@@ -83,29 +83,29 @@ final class HomeViewModel: ObservableObject {
                 return coin.name.lowercased().contains(text) || coin.symbol.lowercased().contains(text)
             }
             .filter { coin in
-            var matches = true
-            
-            if activeFilters.contains(.active) {
-                matches = matches && coin.isActive
+                var matches = true
+                
+                if activeFilters.contains(.active) {
+                    matches = matches && coin.isActive
+                }
+                
+                if activeFilters.contains(.inactive) {
+                    matches = matches && !coin.isActive
+                }
+                
+                if activeFilters.contains(.new) {
+                    matches = matches && coin.isNew
+                }
+                
+                if activeFilters.contains(.token) {
+                    matches = matches && coin.type == .token
+                }
+                
+                if activeFilters.contains(.coins) {
+                    matches = matches && coin.type == .coin
+                }
+                
+                return matches
             }
-            
-            if activeFilters.contains(.inactive) {
-                matches = matches && !coin.isActive
-            }
-            
-            if activeFilters.contains(.new) {
-                matches = matches && coin.isNew
-            }
-            
-            if activeFilters.contains(.token) {
-                matches = matches && coin.type == .token
-            }
-            
-            if activeFilters.contains(.coins) {
-                matches = matches && coin.type == .coin
-            }
-            
-            return matches
-        }
     }
 }

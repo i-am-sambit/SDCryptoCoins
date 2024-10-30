@@ -7,26 +7,43 @@
 
 import Foundation
 
-final class NetworkManager {
-    static let shared = NetworkManager()
-    private let session: URLSession
+// NetworkManager with URLCache
+final class NetworkManager: NSObject {
     private let cache: URLCache
+    private let session: URLSession
+    private let rechability: Rechable
+    private let retryPolicy = RetryPolicy.default
     
-    private init() {
-        // Configure cache: 10 MB memory cache and 50 MB disk cache
-        cache = URLCache(
+    /// Description
+    ///
+    /// 10 MB memory cache
+    /// 50 MB disk cache
+    /// - Parameters:
+    ///   - connectivityChecker: connectivityChecker description
+    ///   - cache: cache description
+    init(
+        rechability: Rechable = Rechability(),
+        cache: URLCache = URLCache(
             memoryCapacity: 10 * 1024 * 1024,
             diskCapacity: 50 * 1024 * 1024,
-            diskPath: nil
-        )
+            diskPath: "networkCache"
+        ),
+        config: URLSessionConfiguration = URLSessionConfiguration.default
+    ) {
+        self.rechability = rechability
         
-        let config = URLSessionConfiguration.default
+        // Configure URLCache with a memory and disk limit
+        self.cache = cache
+        
         config.urlCache = cache
         config.requestCachePolicy = .reloadIgnoringLocalCacheData // Cache policy
         session = URLSession(configuration: config)
     }
     
     func perform<T: Decodable>(request: Request) async throws(NetworkError) -> T {
+        guard rechability.isConnected else {
+            throw .urlError(URLError(.notConnectedToInternet))
+        }
         guard let url = URL(string: request.endpoint) else {
             throw .urlError(URLError(.badURL))
         }
@@ -43,7 +60,11 @@ final class NetworkManager {
         do {
             let (data, response) = try await session.data(for: urlRequest)
             
-            guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw URLError(.badServerResponse)
+            }
+            
+            guard (200...299).contains(httpResponse.statusCode) else {
                 throw URLError(.badServerResponse)
             }
             
@@ -81,5 +102,45 @@ final class NetworkManager {
     private func parse<T: Decodable>(data: Data) throws -> T {
         let decodedData = try JSONDecoder().decode(T.self, from: data)
         return decodedData
+    }
+}
+
+extension NetworkManager: URLSessionDelegate {
+    func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
+        guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+              let serverTrust = challenge.protectionSpace.serverTrust else {
+            return (.cancelAuthenticationChallenge, nil)
+        }
+        
+        var error: CFError?
+        let isTrusted = SecTrustEvaluateWithError(serverTrust, &error)
+        
+        guard isTrusted else {
+            return (.cancelAuthenticationChallenge, nil)
+        }
+        
+        guard let serverCertificateChain = SecTrustCopyCertificateChain(serverTrust),
+                CFArrayGetCount(serverCertificateChain) > 0 else {
+            return (.cancelAuthenticationChallenge, nil)
+        }
+        
+        // Retrieve the first certificate in the chain
+        let serverCertificate = unsafeBitCast(CFArrayGetValueAtIndex(serverCertificateChain, 0), to: SecCertificate.self)
+        
+        // Extract data from the server's certificate
+        let serverCertificateData = SecCertificateCopyData(serverCertificate) as Data
+        
+        // Load the local certificate data
+        guard let localCertPath = Bundle.main.path(forResource: "myserver", ofType: "cer"),
+              let localCertData = NSData(contentsOfFile: localCertPath) as Data? else {
+            return (.cancelAuthenticationChallenge, nil)
+        }
+        
+        // Compare the server certificate with the local pinned certificate
+        guard localCertData == serverCertificateData else {
+            return (.cancelAuthenticationChallenge, nil)
+        }
+        
+        return (.useCredential, URLCredential(trust: serverTrust))
     }
 }
